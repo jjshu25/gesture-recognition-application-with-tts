@@ -2,9 +2,7 @@
 
 
 
-
 ![ic_launcher_monochrome](https://github.com/user-attachments/assets/016bd2d0-0576-4435-bbd7-17c446a48e2e)
-
 
 
 
