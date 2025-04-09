@@ -39,7 +39,7 @@ https://github.com/user-attachments/assets/eff7cada-92cd-4cec-925b-d4c2f6da29e9
 
 # INSTALL
 https://drive.google.com/file/d/1IX6aRmogy5OjpXbZDrcESmhzy_F1LOCL/view?usp=drive_link
-> Download the application from the google drive link above.
-> Install the apk
-> Done. 
+1. Download the application from the google drive link above.
+2. Install the apk
+3. Done. 
 
