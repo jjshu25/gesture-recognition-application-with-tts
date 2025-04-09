@@ -9,7 +9,15 @@
 
 
 > Finger Spelling
+
+
+
+
 https://github.com/user-attachments/assets/6ae96cba-3ed9-4dc8-bcd8-da95f5aed884
+
+
+
+
 
 
 https://github.com/user-attachments/assets/da0af82f-becf-4eef-aa73-0369a114f347
@@ -18,6 +26,9 @@ https://github.com/user-attachments/assets/da0af82f-becf-4eef-aa73-0369a114f347
 
 
 
+
+
+> Pose Detection
 
 
 
