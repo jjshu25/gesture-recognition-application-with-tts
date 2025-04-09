@@ -1,1 +1,1 @@
-# gesture-recognition-application-with-tts
+# gesture-recognition-application-with-tts-thesis-study
