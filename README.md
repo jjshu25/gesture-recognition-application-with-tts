@@ -1,10 +1,6 @@
 # gesture-recognition-application-with-tts
 
-
-
 ![ic_launcher_monochrome](https://github.com/user-attachments/assets/016bd2d0-0576-4435-bbd7-17c446a48e2e)
-
-
 
 
   > A gesture recognition application to capture and process the hand movements of individuals with hearing disabilities into speech in real time.
