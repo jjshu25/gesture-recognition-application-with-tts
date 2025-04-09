@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pose Detection</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .header {
+            color: white;
+            text-align: center;
+            padding: 10px;
+            background-color: rgba(36, 160, 231, 0.8);
+            display: none; /* Hidden initially */
+        }
+        .camera-container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        #canvas {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; /* Maintains aspect ratio without stretching */
+        }
+        #label-container {
+            display: none; /* Hide the label container completely */
+        }
+        /* Hide start button after clicking */
+        #start-button.hidden {
+            display: none;
+        }
+        #start-button {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(36, 160, 231, 0.9);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 18px;
+            cursor: pointer;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">Pose Detection</div>
+    <button id="start-button" onclick="startDetection()">Start Detection</button>
+    <div class="camera-container">
+        <canvas id="canvas"></canvas>
+    </div>
+    <div id="label-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/pose@0.8/dist/teachablemachine-pose.min.js"></script>
+    <script type="text/javascript">
+        // The link to your model provided by Teachable Machine export panel
+        const URL = "https://teachablemachine.withgoogle.com/models/HhksE0TNW/";
+        let model, webcam, ctx, labelContainer, maxPredictions;
+        let isInitialized = false;
+        let predictionData = {};
+        
+        // Add this variable to track when we last sent data to Flutter
+        let lastSentTime = 0;
+        
+        // Function called when button is clicked
+        async function startDetection() {
+            document.getElementById('start-button').classList.add('hidden');
+            if (!isInitialized) {
+                await init();
+                isInitialized = true;
+            }
+        }
+
+        // Automatically init when loaded from Flutter
+        window.addEventListener('flutterInAppWebViewPlatformReady', function(event) {
+            console.log("Flutter InAppWebView is ready");
+            logToFlutter("Flutter InAppWebView is ready!");
+            startDetection();
+        });
+
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            try {
+                // Load the model and metadata
+                model = await tmPose.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+
+                // Use default webcam resolution instead of forcing aspect ratio
+                // Most webcams default to 640x480 (4:3) or something similar
+                const width = 640;  
+                const height = 480;
+                
+                const flip = true; // whether to flip the webcam
+                webcam = new tmPose.Webcam(width, height, flip);
+                await webcam.setup(); // request access to the webcam
+                await webcam.play();
+                
+                // Set up canvas dimensions to match webcam
+                const canvas = document.getElementById("canvas");
+                canvas.width = width;
+                canvas.height = height;
+                ctx = canvas.getContext("2d");
+                
+                // Set up label container
+                labelContainer = document.getElementById("label-container");
+                while (labelContainer.firstChild) {
+                    labelContainer.removeChild(labelContainer.firstChild);
+                }
+                
+                for (let i = 0; i < maxPredictions; i++) {
+                    labelContainer.appendChild(document.createElement("div"));
+                }
+                
+                // Start the animation loop
+                window.requestAnimationFrame(loop);
+            } catch (error) {
+                console.error("Error initializing model:", error);
+                alert("Error initializing camera. Please check permissions and try again.");
+            }
+        }
+
+        async function loop(timestamp) {
+            if (webcam && webcam.canvas) {
+                webcam.update(); // update the webcam frame
+                await predict();
+                window.requestAnimationFrame(loop);
+            }
+        }
+
+        function logToFlutter(message) {
+            // Debug function to send logs to Flutter
+            try {
+                if (window.flutter_inappwebview) {
+                    window.flutter_inappwebview.callHandler('console', message);
+                } else {
+                    console.warn("flutter_inappwebview not available");
+                }
+            } catch (e) {
+                console.error("Error sending log to Flutter:", e);
+            }
+        }
+
+        async function predict() {
+            if (!model || !webcam || !webcam.canvas) return;
+            
+            try {
+                // Prediction #1: run input through posenet
+                const { pose, posenetOutput } = await model.estimatePose(webcam.canvas);
+                
+                // Prediction 2: run input through teachable machine classification model
+                const prediction = await model.predict(posenetOutput);
+
+                // Clear prediction data object
+                predictionData = {};
+                
+                // Update UI and prepare data for Flutter
+                for (let i = 0; i < maxPredictions; i++) {
+                    const className = prediction[i].className;
+                    const probability = prediction[i].probability.toFixed(2);
+                    
+                    // Update UI
+                    const classPrediction = className + ": " + probability;
+                    labelContainer.childNodes[i].innerHTML = classPrediction;
+                    
+                    // Add to data object for Flutter
+                    predictionData[className] = parseFloat(probability);
+                }
+                
+                // Only send to Flutter if at least 150ms have passed since last send
+                // This prevents too many messages which can cause performance issues
+                const now = Date.now();
+                if (now - lastSentTime > 150) {  // Changed from 400ms to 150ms
+                    lastSentTime = now;
+                    
+                    // Send data to Flutter - critical part
+                    try {
+                        if (window.flutter_inappwebview) {
+                            window.flutter_inappwebview.callHandler('poseDetection', JSON.stringify(predictionData));
+                            // Optional: make the visual indicator faster
+                            document.body.style.border = "2px solid green";
+                            setTimeout(() => { document.body.style.border = "none"; }, 50); // Reduced from 100ms
+                        } else {
+                            console.warn("flutter_inappwebview not found when sending prediction");
+                            logToFlutter("flutter_inappwebview not available for sending prediction");
+                        }
+                    } catch (e) {
+                        console.error("Error sending prediction to Flutter:", e);
+                        logToFlutter("Error sending prediction: " + e.toString());
+                    }
+                }
+
+                // Draw the poses
+                drawPose(pose);
+            } catch (error) {
+                console.error("Prediction error:", error);
+                logToFlutter("Prediction error: " + error.toString());
+            }
+        }
+
+        function drawPose(pose) {
+            if (webcam && webcam.canvas && ctx) {
+                ctx.drawImage(webcam.canvas, 0, 0);
+                // Draw the keypoints and skeleton
+                if (pose) {
+                    const minPartConfidence = 0.5;
+                    tmPose.drawKeypoints(pose.keypoints, minPartConfidence, ctx);
+                    tmPose.drawSkeleton(pose.keypoints, minPartConfidence, ctx);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
